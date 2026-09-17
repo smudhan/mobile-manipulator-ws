@@ -47,6 +47,8 @@ slam_toolbox:
 
     use_sim_time: true
 
+    #uncomment following lines and add a maps path to continue mapping on previous map
+
     # mode: mapping
 
     # map_file_name: /home/smudhan/assessment_ws/src/mobile_manipulator_description/map/map3/map3

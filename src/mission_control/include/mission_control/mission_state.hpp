@@ -1,0 +1,22 @@
+#ifndef MISSION_CONTROL__MISSION_STATE_HPP_
+#define MISSION_CONTROL__MISSION_STATE_HPP_
+
+namespace mission_control
+{
+
+enum class MissionState
+{
+  IDLE,
+  NAVIGATE_TO_PICKUP,
+  PICK,
+  WAIT_FOR_PLACE_GOAL,
+  NAVIGATE_TO_PLACE,
+  PLACE,
+  MISSION_COMPLETE,
+  RECOVERY,
+  EMERGENCY_STOP
+};
+
+}  // namespace mission_control
+
+#endif  // MISSION_CONTROL__MISSION_STATE_HPP_
