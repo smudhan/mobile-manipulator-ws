@@ -4,6 +4,12 @@ A ROS 2 Humble simulation of a **mobile manipulator** integrating a **TurtleBot3
 
 The project demonstrates autonomous navigation using Nav2, arm manipulation through ROS 2 actions, a C++ mission-control state machine, RViz goal selection, LiDAR/IMU/camera sensing, and a software emergency-stop mechanism.
 
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-50-59" src="https://github.com/user-attachments/assets/ad610e3c-569a-4066-b77d-9437c1522fb0" />
+
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-50-25" src="https://github.com/user-attachments/assets/f71e4fe9-92b7-47c7-8e23-0cc4dc43e230" />
+
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-53-19" src="https://github.com/user-attachments/assets/fde1201a-a378-461e-9f42-fd0c9b9cf548" />
+
 ## 1. Project Overview
 
 Normal mission flow:
@@ -139,6 +145,8 @@ mission_control/
 
 ## 5. Launch the Simulation
 
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-49-51" src="https://github.com/user-attachments/assets/f0a73430-ca84-4bd0-83b2-3f4ecd20e4e6" />
+
 The main launch starts Gazebo, the hospital world, the combined robot, controllers, Nav2 and RViz2.
 
 ```bash
@@ -184,11 +192,15 @@ The Mission Controller communicates with:
 
 In RViz, use **2D Goal Pose** and select the first destination.
 
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-51-24" src="https://github.com/user-attachments/assets/3cfed77a-3245-4b63-9ebb-1853d997398c" />
+
 The first goal is interpreted as the pickup location. Nav2 navigates the robot there.
 
 ### Pick
 
 After successful navigation, the Mission Controller sends a `/pick` action.
+
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-52-58" src="https://github.com/user-attachments/assets/0d090d71-434f-454a-b40d-aa33a45d5dee" />
 
 The arm:
 
@@ -211,6 +223,8 @@ The arm:
 The mission then returns to `IDLE`.
 
 ## 8. Emergency Stop
+
+<img width="1846" height="1173" alt="Screenshot from 2026-09-17 17-53-56" src="https://github.com/user-attachments/assets/7b669184-9103-4c03-bec6-f9d0e817f1b2" />
 
 Topic:
 
