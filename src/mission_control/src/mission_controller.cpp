@@ -2,7 +2,9 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 #include "mission_control/mission_state.hpp"
 #include "mission_control/action/pick.hpp"
@@ -62,6 +64,28 @@ public:
           std::placeholders::_1));
 
     // ============================================================
+    // Emergency Stop subscriber
+    // ============================================================
+
+    emergency_subscriber_ =
+      this->create_subscription<std_msgs::msg::Bool>(
+        "/emergency",
+        10,
+        std::bind(
+          &MissionController::emergency_callback,
+          this,
+          std::placeholders::_1));
+
+    // ============================================================
+    // Emergency Stop velocity publisher
+    // ============================================================
+
+    cmd_vel_publisher_ =
+      this->create_publisher<geometry_msgs::msg::Twist>(
+        "/cmd_vel",
+        10);
+
+    // ============================================================
     // Nav2 action client
     // ============================================================
 
@@ -109,6 +133,18 @@ private:
   void goal_pose_callback(
     const geometry_msgs::msg::PoseStamped::SharedPtr msg)
   {
+    // Do not accept new goals during emergency stop
+    if (
+      current_state_ ==
+      mission_control::MissionState::EMERGENCY_STOP)
+    {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Goal ignored: EMERGENCY STOP is active");
+
+      return;
+    }
+
     RCLCPP_INFO(
       this->get_logger(),
       "Received 2D Goal Pose: x=%.2f, y=%.2f",
@@ -165,6 +201,115 @@ private:
     RCLCPP_WARN(
       this->get_logger(),
       "Goal received but current state does not accept it");
+  }
+
+  // ============================================================
+  // EMERGENCY STOP CALLBACK
+  // ============================================================
+
+  void emergency_callback(
+    const std_msgs::msg::Bool::SharedPtr msg)
+  {
+    // ------------------------------------------------------------
+    // Emergency stop activated
+    // ------------------------------------------------------------
+
+    if (msg->data)
+    {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "EMERGENCY STOP ACTIVATED");
+
+      // ----------------------------------------------------------
+      // Stop mobile base
+      // ----------------------------------------------------------
+
+      geometry_msgs::msg::Twist stop_cmd;
+
+      stop_cmd.linear.x = 0.0;
+      stop_cmd.linear.y = 0.0;
+      stop_cmd.linear.z = 0.0;
+
+      stop_cmd.angular.x = 0.0;
+      stop_cmd.angular.y = 0.0;
+      stop_cmd.angular.z = 0.0;
+
+      cmd_vel_publisher_->publish(stop_cmd);
+
+      // ----------------------------------------------------------
+      // Cancel active Nav2 goal
+      // ----------------------------------------------------------
+
+      if (navigation_active_)
+      {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Canceling active Nav2 goal");
+
+        nav_client_->async_cancel_all_goals();
+
+        navigation_active_ = false;
+      }
+
+      // ----------------------------------------------------------
+      // Enter emergency stop state
+      // ----------------------------------------------------------
+
+      current_state_ =
+        mission_control::MissionState::EMERGENCY_STOP;
+
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Robot is now in EMERGENCY_STOP state");
+    }
+
+    // ------------------------------------------------------------
+    // Emergency stop reset
+    // ------------------------------------------------------------
+
+    else
+    {
+      if (
+        current_state_ ==
+        mission_control::MissionState::EMERGENCY_STOP)
+      {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Emergency stop reset");
+
+        // Make sure the robot remains stopped
+        geometry_msgs::msg::Twist stop_cmd;
+
+        stop_cmd.linear.x = 0.0;
+        stop_cmd.linear.y = 0.0;
+        stop_cmd.linear.z = 0.0;
+
+        stop_cmd.angular.x = 0.0;
+        stop_cmd.angular.y = 0.0;
+        stop_cmd.angular.z = 0.0;
+
+        cmd_vel_publisher_->publish(stop_cmd);
+
+        // Reset mission state
+        current_state_ =
+          mission_control::MissionState::IDLE;
+
+        place_goal_received_ = false;
+        navigation_active_ = false;
+        pick_active_ = false;
+        place_active_ = false;
+
+        pickup_pose_ =
+          geometry_msgs::msg::PoseStamped();
+
+        place_pose_ =
+          geometry_msgs::msg::PoseStamped();
+
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Mission Controller reset to IDLE");
+      }
+    }
   }
 
   // ============================================================
@@ -249,6 +394,18 @@ private:
     const GoalHandleNavigateToPose::WrappedResult & result)
   {
     navigation_active_ = false;
+
+    // If emergency stop is active, don't change state
+    if (
+      current_state_ ==
+      mission_control::MissionState::EMERGENCY_STOP)
+    {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Navigation result ignored: EMERGENCY STOP is active");
+
+      return;
+    }
 
     switch (result.code)
     {
@@ -413,8 +570,21 @@ private:
   {
     pick_active_ = false;
 
-    if (result.code == rclcpp_action::ResultCode::SUCCEEDED &&
-        result.result->success)
+    // Ignore result if emergency stop is active
+    if (
+      current_state_ ==
+      mission_control::MissionState::EMERGENCY_STOP)
+    {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Pick result ignored: EMERGENCY STOP is active");
+
+      return;
+    }
+
+    if (
+      result.code == rclcpp_action::ResultCode::SUCCEEDED &&
+      result.result->success)
     {
       RCLCPP_INFO(
         this->get_logger(),
@@ -534,8 +704,21 @@ private:
   {
     place_active_ = false;
 
-    if (result.code == rclcpp_action::ResultCode::SUCCEEDED &&
-        result.result->success)
+    // Ignore result if emergency stop is active
+    if (
+      current_state_ ==
+      mission_control::MissionState::EMERGENCY_STOP)
+    {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Place result ignored: EMERGENCY STOP is active");
+
+      return;
+    }
+
+    if (
+      result.code == rclcpp_action::ResultCode::SUCCEEDED &&
+      result.result->success)
     {
       RCLCPP_INFO(
         this->get_logger(),
@@ -693,16 +876,6 @@ private:
           this->get_logger(),
           "State: RECOVERY");
 
-        /*
-         * Recovery behavior will be implemented next.
-         *
-         * Planned behavior:
-         * - Retry navigation
-         * - Retry manipulation
-         * - Detect sensor timeout
-         * - Return to safe state after repeated failures
-         */
-
         break;
 
       // ----------------------------------------------------------
@@ -715,15 +888,21 @@ private:
           this->get_logger(),
           "State: EMERGENCY_STOP");
 
-        /*
-         * Emergency-stop behavior will be implemented next.
-         *
-         * Planned behavior:
-         * - Stop robot velocity
-         * - Cancel active navigation
-         * - Cancel active manipulation
-         * - Keep robot halted until reset
-         */
+        // Keep publishing zero velocity while emergency stop
+        // remains active.
+        {
+          geometry_msgs::msg::Twist stop_cmd;
+
+          stop_cmd.linear.x = 0.0;
+          stop_cmd.linear.y = 0.0;
+          stop_cmd.linear.z = 0.0;
+
+          stop_cmd.angular.x = 0.0;
+          stop_cmd.angular.y = 0.0;
+          stop_cmd.angular.z = 0.0;
+
+          cmd_vel_publisher_->publish(stop_cmd);
+        }
 
         break;
     }
@@ -737,8 +916,18 @@ private:
 
   rclcpp::TimerBase::SharedPtr timer_;
 
+  // ------------------------------------------------------------
+  // Subscribers / Publishers
+  // ------------------------------------------------------------
+
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr
     goal_pose_subscriber_;
+
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr
+    emergency_subscriber_;
+
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr
+    cmd_vel_publisher_;
 
   // ------------------------------------------------------------
   // Nav2

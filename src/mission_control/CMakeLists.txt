@@ -22,6 +22,7 @@ find_package(nav2_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(control_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 find_package(rosidl_default_generators REQUIRED)
 
@@ -128,5 +129,13 @@ install(
 # ============================================================
 
 ament_export_dependencies(rosidl_default_runtime)
-
+ament_target_dependencies(mission_controller
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  nav2_msgs
+  sensor_msgs
+  std_srvs
+  std_msgs
+)
 ament_package()
